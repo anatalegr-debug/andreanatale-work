@@ -36,14 +36,14 @@ html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-fam
   <form id="f" autocomplete="off">
     <h1>Andrea Natale</h1>
     <p>This portfolio is in review. Enter the access code to continue.</p>
-    <input type="password" id="code" aria-label="Access code" placeholder="Access code" required>
+    <input type="password" id="code" aria-label="Access code" placeholder="Access code" inputmode="numeric" pattern="[0-9]*" autocomplete="off" required>
     <p class="err" id="err" aria-live="polite"></p>
     <button type="submit" id="go">Enter</button>
   </form>
 </main>
 <script>
 (function(){
-  const SALT = "2BVi8jYN32OR75SqfNfwhg==", ITER = 310000;
+  const SALT = "PJX0c0YfOeA6hI016YfUhQ==", ITER = 310000;
   const DB = "an-site", STORE = "k";
   const gate = document.getElementById("gate"), err = document.getElementById("err"), go = document.getElementById("go");
   const sw = "serviceWorker" in navigator;
