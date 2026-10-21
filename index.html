@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="theme-color" content="#e8e8e7">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Andrea Natale — Creative Director">
+<meta property="og:url" content="https://andreanatale.work/">
+<meta property="og:description" content="Creative Director. Work (so far).">
+<meta property="og:image" content="https://andreanatale.work/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<title>Andrea Natale — Creative Director</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;700&family=Instrument+Serif:ital@1&display=swap">
+<style>
+:root{--paper:#e8e8e7;--ink:#0d0d0d;--ink-soft:#5f5f5c;--sans:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;--serif:"Instrument Serif","Times New Roman",serif;color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+.gate{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+.gate form{width:min(380px,100%);display:grid;gap:14px}
+.gate[hidden]{display:none}
+.gate h1{margin:0;font-family:var(--serif);font-style:italic;font-weight:400;font-size:40px;line-height:1}
+.gate p{margin:0;font-size:13px;color:var(--ink-soft)}
+.gate input{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--ink);border-radius:2px;background:#fff;color:#0d0d0d}
+.gate button{font:inherit;font-size:14px;padding:9px 16px;border:1px solid var(--ink);border-radius:99px;background:var(--ink);color:var(--paper);cursor:pointer;justify-self:start}
+.gate button:disabled{opacity:.5;cursor:default}
+.gate .err{color:#c0392b;min-height:1.2em}
+</style>
+</head>
+<body>
+<main class="gate" id="gate" hidden>
+  <form id="f" autocomplete="off">
+    <h1>Andrea Natale</h1>
+    <p>This portfolio is in review. Enter the access code to continue.</p>
+    <input type="password" id="code" aria-label="Access code" placeholder="Access code" required>
+    <p class="err" id="err" aria-live="polite"></p>
+    <button type="submit" id="go">Enter</button>
+  </form>
+</main>
+<script>
+(function(){
+  const SALT = "2BVi8jYN32OR75SqfNfwhg==", ITER = 310000;
+  const DB = "an-site", STORE = "k";
+  const gate = document.getElementById("gate"), err = document.getElementById("err"), go = document.getElementById("go");
+  const sw = "serviceWorker" in navigator;
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const idb = () => new Promise((res, rej) => { const r = indexedDB.open(DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const idbGet = async k => { try { const db = await idb(); return await new Promise(res => { const t = db.transaction(STORE).objectStore(STORE).get(k); t.onsuccess = () => res(t.result); t.onerror = () => res(undefined); }); } catch (_) { return undefined; } };
+  const idbSet = async (k, v) => { try { const db = await idb(); await new Promise(res => { const t = db.transaction(STORE, "readwrite").objectStore(STORE).put(v, k); t.onsuccess = t.onerror = () => res(); }); return true; } catch (_) { return false; } };
+  const derive = async code => {
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(code), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: b64(SALT), iterations: ITER }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  };
+  const open = async key => {
+    const buf = await (await fetch("c/site.bin", { cache: "no-cache" })).arrayBuffer();
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(buf, 0, 12) }, key, new Uint8Array(buf, 12));
+    return JSON.parse(new TextDecoder().decode(pt));
+  };
+  const controlled = () => new Promise(res => {
+    if (navigator.serviceWorker.controller) return res(true);
+    navigator.serviceWorker.addEventListener("controllerchange", () => res(true), { once: true });
+    setTimeout(() => res(!!navigator.serviceWorker.controller), 6000);
+  });
+  // without a service worker: write the page here and decrypt each image/video as it appears
+  const fallback = (key, s) => {
+    window.__enc = { key, map: s.map };
+    const boot = "<script>(" + function(){
+      const E = window.__enc, urls = {};
+      const dec = p => urls[p] || (urls[p] = fetch("c/" + E.map[p][0]).then(r => r.arrayBuffer()).then(b =>
+        crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(b, 0, 12) }, E.key, new Uint8Array(b, 12))).then(pt => URL.createObjectURL(new Blob([pt], { type: E.map[p][1] }))));
+      const fix = el => ["src", "poster"].forEach(a => { const v = el.getAttribute && el.getAttribute(a); if (!v || v.startsWith("blob:")) return;
+        const p = v.split("?")[0].replace(/^\.?\//, ""); if (!E.map[p]) return; el.setAttribute(a, ""); dec(p).then(u => el.setAttribute(a, u)); });
+      new MutationObserver(ms => ms.forEach(m => { if (m.type === "attributes") fix(m.target);
+        m.addedNodes.forEach(n => { if (n.nodeType !== 1) return; if (/^(IMG|VIDEO)$/.test(n.tagName)) fix(n); n.querySelectorAll && n.querySelectorAll("img,video").forEach(fix); }); }))
+        .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "poster"] });
+    } + ")()<\/script>";
+    const html = s.html.replace(/<head>/i, "<head>" + boot);
+    document.open(); document.write(html); document.close();
+  };
+  const enter = async (key, s) => {
+    if (sw) {
+      try {
+        const t = ms => new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms));
+        await Promise.race([navigator.serviceWorker.register("sw.js"), t(5000)]);
+        await Promise.race([navigator.serviceWorker.ready, t(5000)]);
+        const last = +(sessionStorage.getItem("an-r") || 0);
+        if (Date.now() - last > 15000 && await controlled()) {
+          try { sessionStorage.setItem("an-r", String(Date.now())); } catch (_) {}
+          navigator.serviceWorker.controller.postMessage("reset"); location.reload(); return;
+        }
+      } catch (_) {}
+    }
+    fallback(key, s || await open(key));
+  };
+  (async () => {
+    if (sw) navigator.serviceWorker.register("sw.js").catch(() => {});
+    const key = await idbGet("key");
+    if (key) { try { const s = await open(key); return enter(key, s); } catch (_) {} }
+    gate.hidden = false; document.getElementById("code").focus();
+  })();
+  document.getElementById("f").addEventListener("submit", async e => {
+    e.preventDefault(); err.textContent = ""; go.disabled = true; go.textContent = "Opening…";
+    try {
+      const key = await derive(document.getElementById("code").value.trim());
+      const s = await open(key);
+      await idbSet("key", key);
+      await enter(key, s);
+    } catch (_) { err.textContent = "Wrong code."; go.disabled = false; go.textContent = "Enter"; }
+  });
+})();
+</script>
+</body>
+</html>
