@@ -56,6 +56,21 @@ html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-fam
     const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(code), "PBKDF2", false, ["deriveKey"]);
     return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: b64(SALT), iterations: ITER }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
   };
+  // the site is encrypted with one master key; every access code (typed code or private link) unlocks a wrapped copy of it
+  const unlock = async code => {
+    const kek = await derive(code);
+    const list = await (await fetch("c/keys.bin", { cache: "no-cache" })).json();
+    for (const e of list) {
+      try {
+        const buf = b64(e);
+        const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: buf.subarray(0, 12) }, kek, buf.subarray(12));
+        const o = JSON.parse(new TextDecoder().decode(pt));
+        const key = await crypto.subtle.importKey("raw", b64(o.k), { name: "AES-GCM" }, false, ["decrypt"]);
+        return { key, label: o.l || "" };
+      } catch (_) {}
+    }
+    throw new Error("wrong code");
+  };
   const open = async key => {
     const buf = await (await fetch("c/site.bin", { cache: "no-cache" })).arrayBuffer();
     const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(buf, 0, 12) }, key, new Uint8Array(buf, 12));
@@ -97,8 +112,21 @@ html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-fam
     }
     fallback(key, s || await open(key));
   };
+  const accept = async code => {
+    const u = await unlock(code);
+    const s = await open(u.key);
+    await idbSet("key", u.key); await idbSet("label", u.label);
+    try { sessionStorage.removeItem("an-c"); } catch (_) {}
+    await enter(u.key, s);
+  };
   (async () => {
     if (sw) navigator.serviceWorker.register("sw.js").catch(() => {});
+    // private link: andreanatale.work/#<code> opens the site directly
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (h) {
+      history.replaceState(null, "", location.pathname);
+      try { return await accept(h); } catch (_) {}
+    }
     const key = await idbGet("key");
     if (key) { try { const s = await open(key); return enter(key, s); } catch (_) {} }
     gate.hidden = false; document.getElementById("code").focus();
@@ -106,10 +134,7 @@ html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-fam
   document.getElementById("f").addEventListener("submit", async e => {
     e.preventDefault(); err.textContent = ""; go.disabled = true; go.textContent = "Opening…";
     try {
-      const key = await derive(document.getElementById("code").value.trim());
-      const s = await open(key);
-      await idbSet("key", key);
-      await enter(key, s);
+      await accept(document.getElementById("code").value.trim());
     } catch (_) { err.textContent = "Wrong code."; go.disabled = false; go.textContent = "Enter"; }
   });
 })();
