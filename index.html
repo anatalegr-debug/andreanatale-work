@@ -115,14 +115,18 @@ html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-fam
   const accept = async code => {
     const u = await unlock(code);
     const s = await open(u.key);
-    await idbSet("key", u.key); await idbSet("label", u.label);
-    try { sessionStorage.removeItem("an-c"); } catch (_) {}
+    const kept = (await idbSet("key", u.key)) && (await idbSet("label", u.label));
+    try { sessionStorage.removeItem("an-c"); sessionStorage.setItem("an-l", u.label); sessionStorage.setItem("an-p", code); } catch (_) {}
+    // no usable storage (some private modes / in-app browsers): open the site right here
+    if (!kept) return fallback(u.key, s);
     await enter(u.key, s);
   };
   (async () => {
     if (sw) navigator.serviceWorker.register("sw.js").catch(() => {});
     // private link: andreanatale.work/#<code> opens the site directly
-    const h = decodeURIComponent(location.hash.slice(1));
+    // the code from a private link survives the one reload that activates the decryptor
+    let pending = ""; try { pending = sessionStorage.getItem("an-p") || ""; } catch (_) {}
+    const h = decodeURIComponent(location.hash.slice(1)) || pending;
     if (h) {
       history.replaceState(null, "", location.pathname);
       try { return await accept(h); } catch (_) {}
