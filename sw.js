@@ -32,6 +32,7 @@ self.addEventListener("fetch", e => {
 async function page(req) {
   try {
     const key = await getKey(); if (!key) return fetch(req);
+    siteP = null; // every page load re-reads the latest published site
     const s = await site(key);
     return new Response(s.html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
   } catch (_) { keyP = null; siteP = null; await idbDel("key"); return fetch(req); }
